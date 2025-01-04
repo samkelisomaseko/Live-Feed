@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Futuristic Multi-Camera App</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&family=Share+Tech+Mono&family=Exo+2:wght@300;400;700&family=Audiowide&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.18.0/matter.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #00ffff;
+            --secondary-color: #ff00ff;
+            --tertiary-color: #ffff00;
+            --background-color: #111;
+            --text-color: #fff;
+            --grid-gap: 10px;
+            --shadow-color: rgba(0, 0, 0, 0.7);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            height: 100vh;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            overflow: hidden;
+        }
+
+        header {
+            padding: 1rem;
+            text-align: center;
+            background-color: rgba(0, 0, 0, 0.5);
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        h1 {
+            font-size: 2rem;
+            color: var(--primary-color);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 5px var(--primary-color);
+        }
+
+        main {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--grid-gap);
+            padding: var(--grid-gap);
+            position: relative;
+        }
+
+        .camera-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--grid-gap);
+        }
+
+        .camera-container {
+            position: relative;
+            overflow: hidden;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .camera-container:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 15px rgba(255, 0, 255, 0.5);
+        }
+
+        .camera-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #controls {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            padding: 1rem;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        button {
+            position: relative;
+            background-color: var(--primary-color);
+            color: var(--background-color);
+            border: none;
+            padding: 0.5rem 1rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-radius: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-family: 'Exo 2', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            overflow: hidden; /* Ensures the pseudo-element doesn't spill out */
+        }
+        
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 60%);
+            pointer-events: none;
+            transform: translate(-50%, -50%) scale(0);
+            opacity: 0;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            z-index: 1;
+        }
+
+        button:hover::before {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #status {
+            font-size: 0.9rem;
+            color: var(--primary-color);
+            font-family: 'Share Tech Mono', monospace;
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        footer {
+            text-align: center;
+            padding: 1rem;
+            background-color: rgba(0, 0, 0, 0.5);
+            font-size: 0.8rem;
+            font-family: 'Audiowide', cursive;
+        }
+
+        .fullscreen-view {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .fullscreen-view video {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 10px;
+        }
+
+        .close-fullscreen {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 2rem;
+            color: var(--text-color);
+            cursor: pointer;
+            transition: color 0.3s ease;
+            background: none;
+            border: none;
+            padding: 0.5rem;
+        }
+
+        .close-fullscreen:hover {
+            color: var(--secondary-color);
+        }
+
+        #physics-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1001;
+        }
+
+        @media (max-width: 768px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 120px;
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -60px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .camera-label {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .motion-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--tertiary-color) 0%, rgba(0,0,0,0) 70%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .motion-indicator.active {
+            opacity: 1;
+            animation: motion-fade 0.5s ease-out forwards;
+        }
+
+        @keyframes motion-fade {
+            0% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(2); }
+        }
+
+        .recording-indicator {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #ff0000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .recording .recording-indicator {
+            opacity: 1;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        .camera-controls {
+            position: absolute;
+            bottom: 40px;
+            left: 10px;
+            display: flex;
+            gap: 5px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .camera-container:hover .camera-controls {
+            opacity: 1;
+        }
+
+        .camera-controls button {
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            border-radius: 50%;
+            padding: 5px;
+            width: 25px;
+            height: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .camera-controls button:hover {
+            transform: scale(1.1);
+            background-color: rgba(0, 0, 0, 0.9);
+        }
+
+        .settings-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            padding: 20px;
+            max-width: 400px;
+            z-index: 1002;
+            display: none;
+        }
+
+        .settings-panel.open {
+            display: block;
+        }
+
+         .settings-panel h2 {
+               color: var(--text-color);
+               margin-bottom: 15px;
+             font-family: 'Orbitron', sans-serif;
+           }
+         .settings-panel label{
+             color: var(--text-color);
+            display: block;
+            margin-bottom: 5px;
+         }
+
+          .settings-panel input[type="range"] {
+             width: 100%;
+             margin-bottom: 15px;
+            -webkit-appearance: none;
+              background: #555;
+                outline: none;
+                height: 5px;
+               border-radius: 5px;
+           }
+
+           .settings-panel input[type="range"]::-webkit-slider-thumb {
+                 -webkit-appearance: none;
+             appearance: none;
+             width: 15px;
+              height: 15px;
+                background: var(--primary-color);
+               cursor: pointer;
+                border-radius: 50%;
+             }
+
+          .settings-panel button#close-settings {
+                 background: var(--secondary-color);
+                  color: var(--background-color);
+                 padding: 10px 15px;
+                   border: none;
+                border-radius: 5px;
+                 cursor: pointer;
+                text-transform: uppercase;
+                 margin-top: 10px;
+             font-family: 'Exo 2', sans-serif;
+             transition: all 0.3s ease;
+          }
+
+         .settings-panel button#close-settings:hover {
+              background: var(--tertiary-color);
+           }
+
+    </style>
+</head>
+<body>
+<canvas id="physics-canvas"></canvas>
+<header>
+    <h1>Shamase Multi-Camera live-feed</h1>
+</header>
+<main>
+    <div class="camera-grid">
+        <div class="camera-container" data-camera-id="1">
+            <video class="camera-feed" autoplay playsinline controls>
+    <source src="http://username:password@192.168.1.10:8080/video.mjpeg" type="video/mp4">
+    Your browser does not support MJPEG streaming.
+</video>
+            <div class="camera-label">Camera 1</div>
+            <div class="motion-indicator"></div>
+            <div class="recording-indicator"></div>
+            <div class="camera-controls">
+                <button class="snapshot-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L7 21"></path></svg>
+                </button>
+                <button class="pause-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                </button>
+                <button class="mute-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="22" y1="2" x2="2" y2="22"></line><line x1="18.7" y1="5.3" x2="5.3" y2="18.7"></line></svg>
+                </button>
+            </div>
+        </div>
+        <div class="camera-container" data-camera-id="2">
+            <video class="camera-feed" autoplay playsinline controls>
+    <source src="http://username:password@192.168.1.11:8080/video.mjpeg" type="video/mp4">
+    Your browser does not support MJPEG streaming.
+</video>
+            <div class="camera-label">Camera 2</div>
+            <div class="motion-indicator"></div>
+            <div class="recording-indicator"></div>
+            <div class="camera-controls">
+                <button class="snapshot-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L7 21"></path></svg>
+                </button>
+                <button class="pause-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                </button>
+                <button class="mute-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="22" y1="2" x2="2" y2="22"></line><line x1="18.7" y1="5.3" x2="5.3" y2="18.7"></line></svg>
+                </button>
+            </div>
+        </div>
+        <div class="camera-container" data-camera-id="3">
+            <video class="camera-feed" autoplay playsinline controls>
+    <source src="http://username:password@192.168.1.11:8080/video.mjpeg" type="video/mp4">
+    Your browser does not support MJPEG streaming.
+</video>
+            <div class="camera-label">Camera 3</div>
+            <div class="motion-indicator"></div>
+            <div class="recording-indicator"></div>
+            <div class="camera-controls">
+                <button class="snapshot-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L7 21"></path></svg>
+                </button>
+                <button class="pause-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                </button>
+                <button class="mute-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="22" y1="2" x2="2" y2="22"></line><line x1="18.7" y1="5.3" x2="5.3" y2="18.7"></line></svg>
+                </button>
+            </div>
+        </div>
+        <div class="camera-container" data-camera-id="4">
+            <video class="camera-feed" autoplay playsinline controls>
+    <source src="http://username:password@192.168.1.11:8080/video.mjpeg" type="video/mp4">
+    Your browser does not support MJPEG streaming.
+</video>
+            <div class="camera-label">Camera 4</div>
+            <div class="motion-indicator"></div>
+            <div class="recording-indicator"></div>
+            <div class="camera-controls">
+                <button class="snapshot-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L7 21"></path></svg>
+                </button>
+                <button class="pause-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                </button>
+                <button class="mute-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="22" y1="2" x2="2" y2="22"></line><line x1="18.7" y1="5.3" x2="5.3" y2="18.7"></line></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div id="controls">
+        <button id="start-cameras" class="tooltip">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+            </svg>
+            Start Cameras
+            <span class="tooltiptext">Begin all camera feeds</span>
+        </button>
+        <button id="toggle-motion" class="tooltip" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+            </svg>
+            Toggle Motion Detection
+            <span class="tooltiptext">Enable/disable motion detection</span>
+        </button>
+        <button id="toggle-recording" class="tooltip" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            Start Recording
+            <span class="tooltiptext">Start/stop recording all cameras</span>
+        </button>
+        <button id="settings" class="tooltip">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            Settings
+            <span class="tooltiptext">Adjust app settings</span>
+        </button>
+    </div>
+    <div id="status">Click "Start Cameras" to begin</div>
+</main>
+<footer>
+    © 2025 Futuristic Multi-Camera App. All rights reserved.
+</footer>
+
+<div class="settings-panel" id="settingsPanel">
+    <h2>Settings</h2>
+    <label for="motion-sensitivity">Motion Sensitivity:</label>
+     <input type="range" id="motion-sensitivity" min="0" max="100" value="50">
+    <label for="audio-volume">Audio Volume:</label>
+        <input type="range" id="audio-volume" min="0" max="100" value="70">
+        <button id="close-settings">Close Settings</button>
+</div>
+<audio id="clickSound" src="click.mp3" preload="auto"></audio>
+
+<script>
+    const cameraContainers = document.querySelectorAll('.camera-container');
+    const startButton = document.getElementById('start-cameras');
+    const motionButton = document.getElementById('toggle-motion');
+    const recordingButton = document.getElementById('toggle-recording');
+    const settingsButton = document.getElementById('settings');
+    const statusDiv = document.getElementById('status');
+    const physicsCanvas = document.getElementById('physics-canvas');
+    const settingsPanel = document.getElementById('settingsPanel');
+    const closeSettingsButton = document.getElementById('close-settings');
+    const motionSensitivityInput = document.getElementById('motion-sensitivity');
+    const audioVolumeInput = document.getElementById('audio-volume');
+
+    const cameraFeeds = [
+        "http://username:password@192.168.1.10:8080/video.mjpeg",
+        "http://username:password@192.168.1.11:8080/video.mjpeg",
+        "http://username:password@192.168.1.12:8080/video.mjpeg",
+        "http://username:password@192.168.1.13:8080/video.mjpeg"
+    ];
+
+    let isMotionDetectionActive = false;
+    let isRecording = false;
+    let motionSensitivity = 50;
+    let audioVolume = 0.7;
+    let mediaRecorders = {}; // To store MediaRecorder instances
+
+    // Audio sound
+    const clickSound = document.getElementById('clickSound');
+
+    function playClickSound() {
+        clickSound.currentTime = 0;
+        clickSound.volume = audioVolume;
+        clickSound.play();
+    }
+
+    // GSAP config
+    gsap.config({
+        force3D: true,
+    });
+
+    // Matter.js setup
+    const { Engine, Render, World, Bodies, Mouse, MouseConstraint } = Matter;
+    const engine = Engine.create();
+    const world = engine.world;
+
+    const canvas = document.getElementById('physics-canvas');
+    const render = Render.create({
+        canvas: canvas,
+        engine: engine,
+        options: {
+            width: window.innerWidth,
+            height: window.innerHeight,
+            wireframes: false,
+            background: 'transparent'
+        }
+    });
+
+    const mouse = Mouse.create(render.canvas);
+    const mouseConstraint = MouseConstraint.create(engine, {
+        mouse: mouse,
+        constraint: {
+            stiffness: 0.2,
+            render: {
+                visible: false
+            }
+        }
+    });
+
+    World.add(world, mouseConstraint);
+
+    Engine.run(engine);
+    Render.run(render);
+
+    function createPhysicsObject(x, y) {
+        const size = Math.random() * 20 + 10;
+        const color = Math.random() < 0.5 ? '#00ffff' : '#ff00ff';
+        return Bodies.circle(x, y, size, {
+            restitution: 0.9,
+            friction: 0.001,
+            render: {
+                fillStyle: color
+            }
+        });
+    }
+
+    function createRippleEffect(x, y, container) {
+        const ripple = document.createElement('div');
+        ripple.className = 'motion-indicator active';
+        ripple.style.left = `${x}px`;
+        ripple.style.top = `${y}px`;
+        container.appendChild(ripple);
+
+        setTimeout(() => {
+            ripple.remove();
+        }, 500);
+    }
+
+    canvas.addEventListener('click', (event) => {
+        const object = createPhysicsObject(event.clientX, event.clientY);
+        World.add(world, object);
+    });
+
+   function startCameras() {
+    cameraContainers.forEach((container, index) => {
+        const video = container.querySelector('video');
+        if (cameraFeeds[index]) {
+            video.src = cameraFeeds[index];
+
+             video.addEventListener('error', (error) => {
+                console.error(`Error loading camera feed ${index + 1}:`, error);
+                updateStatus(`Error loading camera feed ${index + 1}: ${error.message}`);
+            });
+
+            video.addEventListener('stalled', () => {
+                 updateStatus(`Camera ${index + 1} stalled, check connection`);
+                console.warn(`Camera ${index + 1} stalled, check connection`);
+            });
+
+
+        } else {
+            console.error(`No camera feed URL provided for camera at index ${index}`);
+            updateStatus(`No camera feed URL provided for camera ${index + 1}`);
+         }
+    });
+
+    startButton.textContent = 'Stop Cameras';
+    motionButton.disabled = false;
+    recordingButton.disabled = false;
+     updateStatus('All cameras started successfully');
+    playClickSound();
+}
+
+
+
+
+    function stopCameras() {
+        cameraContainers.forEach(container => {
+            const video = container.querySelector('video');
+            video.removeAttribute('src');
+            video.load();
+        });
+
+        // Stop all recorders
+        for(const id in mediaRecorders) {
+            if(mediaRecorders[id] && mediaRecorders[id].state === 'recording'){
+                mediaRecorders[id].stop();
+            }
+        }
+       mediaRecorders = {};
+
+        startButton.textContent = 'Start Cameras';
+        motionButton.disabled = true;
+        recordingButton.disabled = true;
+         updateStatus('Cameras stopped');
+        playClickSound();
+    }
+
+    function toggleMotionDetection() {
+        isMotionDetectionActive = !isMotionDetectionActive;
+        if (isMotionDetectionActive) {
+            cameraContainers.forEach(container => {
+                const video = container.querySelector('video');
+                detectMotion(video, container);
+            });
+            motionButton.textContent = 'Stop Motion Detection';
+             updateStatus('Motion detection active');
+        } else {
+            motionButton.textContent = 'Start Motion Detection';
+             updateStatus('Motion detection stopped');
+        }
+        playClickSound();
+    }
+
+
+   function toggleRecording() {
+    isRecording = !isRecording;
+        if (isRecording) {
+             cameraContainers.forEach((container,index) => {
+                container.classList.add('recording');
+                 startRecording(container.querySelector('video'), index + 1);
+              });
+
+             recordingButton.textContent = 'Stop Recording';
+              updateStatus('Recording started');
+        } else {
+            cameraContainers.forEach(container => {
+                container.classList.remove('recording');
+            });
+            stopAllRecordings();
+            recordingButton.textContent = 'Start Recording';
+            updateStatus('Recording stopped');
+        }
+       playClickSound();
+  }
+
+   function startRecording(video, cameraId) {
+        if(!video.srcObject){
+          console.warn(`Cannot record camera ${cameraId}, No media source found.`);
+          updateStatus(`Cannot record camera ${cameraId}, No media source found.`);
+         return;
+      }
+
+        try {
+            const stream = video.srcObject.clone(); // Clone the stream
+            const recorder = new MediaRecorder(stream, {mimeType: 'video/webm'});
+             let chunks = [];
+
+
+             recorder.ondataavailable = event => {
+              if (event.data.size > 0) {
+                chunks.push(event.data);
+                 }
+             };
+
+             recorder.onstop = () => {
+                  const blob = new Blob(chunks, { type: 'video/webm' });
+                  const url = URL.createObjectURL(blob);
+                   const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `camera_${cameraId}_recording_${new Date().getTime()}.webm`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url); // Clean up
+                   chunks = [];
+            };
+            recorder.start();
+            mediaRecorders[cameraId] = recorder;
+            console.log(`Recording started for Camera ${cameraId}`);
+
+        } catch (error) {
+              console.error(`Error starting recording for Camera ${cameraId}:`, error);
+            updateStatus(`Error starting recording for Camera ${cameraId}: ${error.message}`);
+         }
+     }
+
+
+
+   function stopAllRecordings() {
+      for (const id in mediaRecorders) {
+            if (mediaRecorders[id] && mediaRecorders[id].state === 'recording') {
+                try {
+                    mediaRecorders[id].stop();
+                    console.log(`Recording stopped for Camera ${id}`);
+                 } catch (error) {
+                    console.error(`Error stopping recording for Camera ${id}:`, error);
+                     updateStatus(`Error stopping recording for Camera ${id}: ${error.message}`);
+                }
+            }
+        }
+         mediaRecorders = {};
+    }
+
+
+   function detectMotion(video, container) {
+        if (!isMotionDetectionActive) return;
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        let previousImageData;
+
+        function compare() {
+            if (!isMotionDetectionActive) return;
+              if (video.readyState >= video.HAVE_CURRENT_DATA) {
+                try {
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+                    if (previousImageData) {
+                        const diff = compareImages(imageData, previousImageData);
+                        if (diff > motionSensitivity) {
+                            const rect = video.getBoundingClientRect();
+                            const centerX = rect.left + rect.width / 2;
+                            const centerY = rect.top + rect.height / 2;
+
+                            createRippleEffect(centerX, centerY, container);
+
+                            for (let i = 0; i < 3; i++) {
+                            const object = createPhysicsObject(
+                                centerX + Math.random() * 50 - 25,
+                                centerY + Math.random() * 50 - 25
+                                );
+                             World.add(world, object);
+                            }
+                       }
+                  }
+
+                  previousImageData = imageData;
+                 } catch (error) {
+                    console.error('Error during motion detection:', error);
+               }
+            }
+            requestAnimationFrame(compare);
+        }
+        compare();
+    }
+
+    function compareImages(imageData1, imageData2) {
+        const data1 = imageData1.data;
+        const data2 = imageData2.data;
+        let diff = 0;
+
+        for (let i = 0; i < data1.length; i += 4) {
+            diff += Math.abs(data1[i] - data2[i]);
+        }
+
+        return diff / (imageData1.width * imageData1.height);
+    }
+
+    function updateStatus(message) {
+        statusDiv.textContent = message;
+    }
+
+   startButton.addEventListener('click', () => {
+       if (startButton.textContent === 'Stop Cameras') {
+           stopCameras();
+       } else {
+           startCameras();
+       }
+    });
+
+    motionButton.addEventListener('click', toggleMotionDetection);
+    recordingButton.addEventListener('click', toggleRecording);
+
+   cameraContainers.forEach(container => {
+        container.addEventListener('click', () => {
+            const video = container.querySelector('video');
+            const fullscreenView = document.createElement('div');
+            fullscreenView.className = 'fullscreen-view';
+
+            const fullscreenVideo = video.cloneNode(true);
+            fullscreenVideo.src = video.src;
+
+
+            fullscreenVideo.controls = true;
+
+            const closeButton = document.createElement('button');
+            closeButton.className = 'close-fullscreen';
+            closeButton.innerHTML = '×';
+            closeButton.addEventListener('click', () => {
+                gsap.to(fullscreenView, {
+                    opacity: 0,
+                    duration: 0.3,
+                    onComplete: () => {
+                        document.body.removeChild(fullscreenView);
+                    }
+                });
+            });
+
+            fullscreenView.appendChild(fullscreenVideo);
+            fullscreenView.appendChild(closeButton);
+            document.body.appendChild(fullscreenView);
+
+            // Fullscreen animation with GSAP
+            gsap.from(fullscreenView, {
+                opacity: 0,
+                duration: 0.3,
+            });
+        });
+    });
+
+
+    // Initialize
+    motionButton.disabled = true;
+    recordingButton.disabled = true;
+    updateStatus('Click "Start Cameras" to begin');
+
+    // Resize event for Matter.js canvas
+    window.addEventListener('resize', () => {
+        render.canvas.width = window.innerWidth;
+        render.canvas.height = window.innerHeight;
+        Render.setPixelRatio(render, window.devicePixelRatio);
+    });
+
+
+    // Settings functionality
+    settingsButton.addEventListener('click', () => {
+        settingsPanel.classList.add('open');
+        playClickSound();
+        gsap.fromTo(settingsPanel, { opacity: 0, scale: 0.8 }, { opacity: 1, scale: 1, duration: 0.3 });
+    });
+
+    closeSettingsButton.addEventListener('click', () => {
+        gsap.to(settingsPanel, {
+            opacity: 0,
+            scale: 0.8,
+            duration: 0.3,
+            onComplete: () => {
+                settingsPanel.classList.remove('open');
+            }
+        });
+        playClickSound();
+    });
+
+    // Button click animation
+    const buttons = document.querySelectorAll('button');
+
+    buttons.forEach(button => {
+        button.addEventListener('click', () => {
+            gsap.to(button, {
+                scale: 0.95,
+                duration: 0.1,
+                ease: "power1.inOut",
+                onComplete: () => {
+                    gsap.to(button, { scale: 1, duration: 0.1, ease: "power1.out" });
+                },
+            });
+        });
+    });
+
+    // Camera controls overlay
+    const cameraControls = document.querySelectorAll('.camera-controls button');
+    cameraControls.forEach(control => {
+        control.addEventListener('click', (e) => {
+            e.stopPropagation();
+            playClickSound();
+            if (control.classList.contains('mute-button')) {
+                const svg = control.querySelector('svg');
+                if (svg.innerHTML.includes('line')) {
+                    svg.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>`;
+
+                } else {
+                    svg.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="22" y1="2" x2="2" y2="22"></line><line x1="18.7" y1="5.3" x2="5.3" y2="18.7"></line>`;
+                }
+            }
+            //Pause button functionality
+             if(control.classList.contains('pause-button')){
+                 const video = control.closest('.camera-container').querySelector('video');
+                if(!video.paused) {
+                    video.pause();
+                    control.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`
+                }else{
+                    video.play();
+                    control.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`
+                }
+            }
+              //Snapshot functionality
+            if (control.classList.contains('snapshot-button')) {
+                const video = control.closest('.camera-container').querySelector('video');
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const context = canvas.getContext('2d');
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const dataURL = canvas.toDataURL('image/png');
+                 const link = document.createElement('a');
+                link.href = dataURL;
+                link.download = `snapshot_${new Date().getTime()}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+           }
+        });
+    });
+
+    motionSensitivityInput.addEventListener('input', function() {
+        motionSensitivity = parseInt(this.value);
+    });
+
+    audioVolumeInput.addEventListener('input', function() {
+        audioVolume = parseFloat(this.value / 100);
+    });
+</script>
+</body>
+</html>
